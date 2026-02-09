@@ -23,8 +23,8 @@ Quickstart
    b. Click "New OAuth App" or "Register a new application"
    c. Fill in the application details:
       - Application name: blaaaah (or any name you prefer)
-      - Homepage URL: http://localhost (or your preferred URL)
-      - Authorization callback URL: http://localhost (device flow doesn't use callbacks)
+      - Homepage URL: https://github.com/yourusername/blaaaah (use your repository URL)
+      - Authorization callback URL: https://github.com/yourusername/blaaaah (device flow doesn't require callbacks)
    d. Click "Register application"
    e. Copy the "Client ID" from the app page
    f. **Option 1**: Set as environment variable:

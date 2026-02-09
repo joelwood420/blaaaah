@@ -111,7 +111,7 @@ class SettingsScreen(QWidget):
         v.addWidget(self.client_id_input)
         
         v.addWidget(QLabel("select days"))
-        days = ["mon", "tues", "wed", "th", "fri", "sat", "sun"]
+        days = ["mon", "tues", "wed", "thu", "fri", "sat", "sun"]
         self.checks = {}
         h = QHBoxLayout()
         for d in days:
@@ -140,7 +140,8 @@ class SettingsScreen(QWidget):
         client_id = self.client_id_input.text().strip()
         if client_id:
             save_client_id(client_id)
-            QMessageBox.information(self, "Success", "Settings saved successfully!")
+        
+        QMessageBox.information(self, "Success", "Settings saved successfully!")
 
 
 class GitHubLoginDialog(QDialog):
