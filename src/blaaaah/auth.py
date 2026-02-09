@@ -17,12 +17,20 @@ def get_client_id() -> Optional[str]:
         return client_id
     
     # Fall back to keyring storage
-    return keyring.get_password(SERVICE_NAME, "github_client_id")
+    try:
+        return keyring.get_password(SERVICE_NAME, "github_client_id")
+    except Exception:
+        # Keyring might not be available in some environments
+        return None
 
 
 def save_client_id(client_id: str):
     """Save GitHub OAuth client ID to keyring."""
-    keyring.set_password(SERVICE_NAME, "github_client_id", client_id)
+    try:
+        keyring.set_password(SERVICE_NAME, "github_client_id", client_id)
+    except Exception:
+        # Keyring might not be available in some environments
+        pass
 
 
 def start_device_flow(client_id: str, scope: str = "repo") -> Dict:
@@ -45,8 +53,16 @@ def poll_token_once(client_id: str, device_code: str) -> Dict:
 
 
 def save_token(token: str):
-    keyring.set_password(SERVICE_NAME, "github_token", token)
+    try:
+        keyring.set_password(SERVICE_NAME, "github_token", token)
+    except Exception:
+        # Keyring might not be available in some environments
+        pass
 
 
 def get_saved_token() -> Optional[str]:
-    return keyring.get_password(SERVICE_NAME, "github_token")
+    try:
+        return keyring.get_password(SERVICE_NAME, "github_token")
+    except Exception:
+        # Keyring might not be available in some environments
+        return None
