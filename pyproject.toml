@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "blaaaah"
+version = "0.1.0"
+description = "Small desktop app: blaaah — bullet notes + GitHub integration (MVP)"
+authors = ["""]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+PySide6 = "*"
+requests = "*"
+PyGithub = "*"
+keyring = "*"
+APScheduler = "*"
+
+[tool.poetry.scripts]
+blaaaah = "blaaaah.main:main"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
