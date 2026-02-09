@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QApplication,
 )
-from .auth import start_device_flow, poll_token_once, save_token, get_saved_token
+from .auth import start_device_flow, poll_token_once, save_token, get_saved_token, get_client_id, save_client_id
 import threading
 import time
 
@@ -100,8 +100,18 @@ class SettingsScreen(QWidget):
         v = QVBoxLayout()
         v.setContentsMargins(12, 12, 12, 12)
         v.addWidget(QLabel("Settings"))
+        
+        # GitHub Client ID section
+        v.addWidget(QLabel("GitHub OAuth Client ID:"))
+        self.client_id_input = QLineEdit()
+        client_id = get_client_id()
+        if client_id:
+            self.client_id_input.setText(client_id)
+        self.client_id_input.setPlaceholderText("Enter your GitHub OAuth App Client ID")
+        v.addWidget(self.client_id_input)
+        
         v.addWidget(QLabel("select days"))
-        days = ["mon", "tues", "wed", "th", "fri", "sat", "sun"]
+        days = ["mon", "tues", "wed", "thu", "fri", "sat", "sun"]
         self.checks = {}
         h = QHBoxLayout()
         for d in days:
@@ -125,6 +135,13 @@ class SettingsScreen(QWidget):
     def save(self):
         days = [d for d, cb in self.checks.items() if cb.isChecked()]
         self.storage.save_prefs({"days": days})
+        
+        # Save GitHub Client ID if provided
+        client_id = self.client_id_input.text().strip()
+        if client_id:
+            save_client_id(client_id)
+        
+        QMessageBox.information(self, "Success", "Settings saved successfully!")
 
 
 class GitHubLoginDialog(QDialog):
@@ -213,9 +230,25 @@ class MainWindow(QMainWindow):
             self.stack.setCurrentWidget(self.welcome)
 
     def on_signin(self):
+        # Check if client ID is configured
+        client_id = get_client_id()
+        if not client_id:
+            QMessageBox.warning(
+                self,
+                "Configuration Required",
+                "Please configure your GitHub OAuth Client ID in Settings first.\n\n"
+                "To create a GitHub OAuth App:\n"
+                "1. Go to https://github.com/settings/developers\n"
+                "2. Click 'New OAuth App'\n"
+                "3. Fill in the application details\n"
+                "4. Copy the Client ID and paste it in Settings"
+            )
+            self.show_settings()
+            return
+        
         # open device flow dialog
         from PySide6.QtCore import Qt
-        dialog = GitHubLoginDialog("YOUR_GITHUB_OAUTH_CLIENT_ID", parent=self)
+        dialog = GitHubLoginDialog(client_id, parent=self)
         dialog.setWindowModality(Qt.ApplicationModal)
         dialog.exec()
         token = get_saved_token()
