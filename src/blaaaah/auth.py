@@ -1,11 +1,28 @@
 import requests
 import keyring
+import os
 from typing import Optional, Dict
 
 DEVICE_URL = "https://github.com/login/device/code"
 TOKEN_URL = "https://github.com/login/oauth/access_token"
 
 SERVICE_NAME = "blaaaah"
+
+
+def get_client_id() -> Optional[str]:
+    """Get GitHub OAuth client ID from environment variable or keyring."""
+    # First try environment variable
+    client_id = os.environ.get("GITHUB_CLIENT_ID")
+    if client_id:
+        return client_id
+    
+    # Fall back to keyring storage
+    return keyring.get_password(SERVICE_NAME, "github_client_id")
+
+
+def save_client_id(client_id: str):
+    """Save GitHub OAuth client ID to keyring."""
+    keyring.set_password(SERVICE_NAME, "github_client_id", client_id)
 
 
 def start_device_flow(client_id: str, scope: str = "repo") -> Dict:
