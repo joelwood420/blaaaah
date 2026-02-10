@@ -22,15 +22,18 @@ import time
 
 
 class TopBar(QWidget):
-    def __init__(self, title: str, on_settings):
+    def __init__(self, title: str, on_settings, on_generate=None):
         super().__init__()
         h = QHBoxLayout()
         h.setContentsMargins(8, 8, 8, 8)
-        icon = QLabel("icon")
-        icon.setFixedWidth(40)
-        h.addWidget(icon)
-        h.addWidget(QLabel(title))
+        # show a single descriptive title instead of an icon + app name
+        label = QLabel("What have you done today?")
+        h.addWidget(label)
         h.addStretch()
+        gen_btn = QPushButton("Test 5pm")
+        if callable(on_generate):
+            gen_btn.clicked.connect(on_generate)
+        h.addWidget(gen_btn)
         settings_btn = QPushButton("settings")
         settings_btn.clicked.connect(on_settings)
         h.addWidget(settings_btn)
@@ -81,26 +84,43 @@ class EditorScreen(QWidget):
 
 
 class PasteRepoScreen(QWidget):
-    def __init__(self, on_submit):
+    def __init__(self, storage):
+        """Plain bullet-point notes editor (uses same storage as EditorScreen).
+        Kept as a separate screen in the stack but functions like the main editor.
+        """
         super().__init__()
         v = QVBoxLayout()
         v.setContentsMargins(12, 12, 12, 12)
-        v.addWidget(QLabel("Paste Github Repo"))
-        self.input = QLineEdit()
-        v.addWidget(self.input)
-        submit = QPushButton("Submit")
-        submit.clicked.connect(lambda: on_submit(self.input.text()))
-        v.addWidget(submit)
+        self.editor = QTextEdit()
+        self.editor.setPlaceholderText("- bullet style text editor....")
+        data = storage.load_notes()
+        self.editor.setPlainText(data.get("content", ""))
+        self.storage = storage
+        v.addWidget(self.editor)
+        # Auto-save on changes (no manual Save button on home screen)
+        self.editor.textChanged.connect(self.autosave)
         self.setLayout(v)
+
+    def save(self):
+        content = self.editor.toPlainText()
+        self.storage.save_notes({"content": content})
+        # legacy save method kept for compatibility
+
+    def autosave(self):
+        content = self.editor.toPlainText()
+        try:
+            self.storage.save_notes({"content": content})
+        except Exception:
+            pass
 
 
 class SettingsScreen(QWidget):
-    def __init__(self, storage):
+    def __init__(self, storage, on_home=None):
         super().__init__()
         v = QVBoxLayout()
         v.setContentsMargins(12, 12, 12, 12)
         v.addWidget(QLabel("Settings"))
-        
+
         # GitHub Client ID section
         v.addWidget(QLabel("GitHub OAuth Client ID:"))
         self.client_id_input = QLineEdit()
@@ -109,7 +129,13 @@ class SettingsScreen(QWidget):
             self.client_id_input.setText(client_id)
         self.client_id_input.setPlaceholderText("Enter your GitHub OAuth App Client ID")
         v.addWidget(self.client_id_input)
-        
+
+        # GitHub push repo section
+        v.addWidget(QLabel("GitHub Repository to push reflections (owner/repo):"))
+        self.push_repo_input = QLineEdit()
+        self.push_repo_input.setPlaceholderText("owner/repo (e.g. joelwood420/blaaaah)")
+        v.addWidget(self.push_repo_input)
+
         v.addWidget(QLabel("select days"))
         days = ["mon", "tues", "wed", "thu", "fri", "sat", "sun"]
         self.checks = {}
@@ -122,7 +148,13 @@ class SettingsScreen(QWidget):
         save = QPushButton("Save")
         save.clicked.connect(self.save)
         v.addWidget(save)
+
+        home = QPushButton("Home")
+        home.clicked.connect(self.home)
+        v.addWidget(home)
+
         self.storage = storage
+        self.on_home = on_home
         self.load()
         self.setLayout(v)
 
@@ -131,17 +163,32 @@ class SettingsScreen(QWidget):
         days = prefs.get("days", [])
         for d, cb in self.checks.items():
             cb.setChecked(d in days)
+        push_repo = prefs.get("push_repo", "")
+        if push_repo:
+            self.push_repo_input.setText(push_repo)
 
     def save(self):
         days = [d for d, cb in self.checks.items() if cb.isChecked()]
-        self.storage.save_prefs({"days": days})
-        
+        prefs = {"days": days}
+        push_repo = self.push_repo_input.text().strip()
+        if push_repo:
+            prefs["push_repo"] = push_repo
+        self.storage.save_prefs(prefs)
+
         # Save GitHub Client ID if provided
         client_id = self.client_id_input.text().strip()
         if client_id:
             save_client_id(client_id)
-        
+
         QMessageBox.information(self, "Success", "Settings saved successfully!")
+
+    def home(self):
+        # called when user clicks Home; delegate to provided callback if any
+        if callable(getattr(self, 'on_home', None)):
+            try:
+                self.on_home()
+            except Exception:
+                pass
 
 
 class GitHubLoginDialog(QDialog):
@@ -204,15 +251,17 @@ class MainWindow(QMainWindow):
     def __init__(self, storage):
         super().__init__()
         self.setWindowTitle("blaaah")
+        # keep a reference to storage for actions triggered from the UI
+        self.storage = storage
         central = QWidget()
         layout = QVBoxLayout()
-        self.top = TopBar("blaaah", self.show_settings)
+        self.top = TopBar("blaaah", self.show_settings, on_generate=self.generate_now)
         layout.addWidget(self.top)
         self.stack = QStackedWidget()
         self.welcome = WelcomeScreen(self.on_signin)
         self.editor = EditorScreen(storage)
-        self.paste = PasteRepoScreen(self.on_paste)
-        self.settings = SettingsScreen(storage)
+        self.paste = PasteRepoScreen(storage)
+        self.settings = SettingsScreen(storage, on_home=self.show_home)
         self.stack.addWidget(self.welcome)
         self.stack.addWidget(self.editor)
         self.stack.addWidget(self.paste)
@@ -221,13 +270,19 @@ class MainWindow(QMainWindow):
         central.setLayout(layout)
         self.setCentralWidget(central)
 
-        # check for existing token
-        token = get_saved_token()
-        if token:
-            # already signed in — go to paste screen
-            self.stack.setCurrentWidget(self.paste)
-        else:
-            self.stack.setCurrentWidget(self.welcome)
+    def generate_now(self):
+        # call the generate action and show result
+        from .actions import simulate_5pm
+        res = simulate_5pm(self.storage, push=True, force=False)
+        if not res:
+            QMessageBox.information(self, "Test 5pm", "No action taken — either no notes or today is not selected in settings.")
+            return
+        msg = "Reflection generated and saved locally."
+        if res.get("pushed"):
+            msg += " Also pushed to GitHub."
+        elif res.get("repo"):
+            msg += " Push attempted but failed."
+        QMessageBox.information(self, "Test 5pm", msg)
 
     def on_signin(self):
         # Check if client ID is configured
@@ -245,7 +300,7 @@ class MainWindow(QMainWindow):
             )
             self.show_settings()
             return
-        
+
         # open device flow dialog
         from PySide6.QtCore import Qt
         dialog = GitHubLoginDialog(client_id, parent=self)
@@ -262,3 +317,11 @@ class MainWindow(QMainWindow):
 
     def show_settings(self):
         self.stack.setCurrentWidget(self.settings)
+
+    def show_home(self):
+        # determine target screen based on sign-in status
+        token = get_saved_token()
+        if token:
+            self.stack.setCurrentWidget(self.paste)
+        else:
+            self.stack.setCurrentWidget(self.welcome)
