@@ -3,8 +3,8 @@ import requests
 from typing import Optional
 
 
-GEMMA_API_URL = os.environ.get("https://aistudio.google.com/api-keys?projectFilter=gen-lang-client-0456225243")
-GEMMA_API_KEY = os.environ.get("AIzaSyDV6bE-O2Qsv-VwibrUw01zWk8L_uk3fjY")
+GEMMA_API_URL = os.environ.get("")
+GEMMA_API_KEY = os.environ.get("")
 
 
 def _call_remote(prompt: str, max_tokens: int = 300) -> Optional[str]:
